@@ -1,0 +1,48 @@
+name: Deploy Full Stack Monorepo
+
+# Ye pipeline tab chalegi jab aap 'main' branch par code push karenge
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Build & Deploy
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # SABSE IMPORTANT STEP: Root me install karna taaki 'packages' link ho jayein
+      - name: Install All Dependencies (Root Workspace)
+        run: npm install
+
+      # 1. DEPLOY BACKEND (Cloudflare Workers)
+      - name: Deploy Backend
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'apps/backend'
+          command: deploy src/index.ts
+
+      # 2. DEPLOY FRONTEND (Cloudflare Pages)
+      # Pehle frontend ko build karenge, phir deploy
+      - name: Build Frontend
+        working-directory: ./apps/frontend
+        run: npm run build
+
+      - name: Deploy Frontend
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: 'uttamsewa-ui' # Cloudflare Pages me is naam se project banega
+          directory: 'apps/frontend/dist' # Vite yahan output deta hai
+          branch: main
